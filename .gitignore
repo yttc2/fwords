@@ -1,0 +1,30 @@
+# ── 依赖 / 虚拟环境 ──────────────────────────────
+.venv*/
+tools/.venv-timer/
+tools/timer/build/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# ── 构建 / 打包产物 ──────────────────────────────
+dist/
+build/
+*.exe
+*.zip
+
+# ── 版权数据（不入公开仓库）─────────────────────
+# data/ 内含《十天搞定考研词汇》书版词库（正版出版物，禁公开分发）
+data/
+# 由 tools/import_words.py 从 data/user-libs.json 生成的产物，含同一份书版词库
+demo/wordlists.user.js
+
+# ── 编辑器 / 系统 ────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── WorkBuddy 工具数据 ───────────────────────────
+.workbuddy/
