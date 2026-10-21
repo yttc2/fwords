@@ -659,12 +659,13 @@ console.log('\n[14] T2 复习完不会紧接着弹一次重复的 T1（回归）
   ok(hitT1, 'T1 没有被废掉：攒够 6 个词仍会触发 T1');
 }
 
-console.log('\n[15] 只有停在学习页才计时（回归）');
+console.log('\n[15] 只有停在学习页才计时 + 设置面板按来路返回（回归）');
 {
-  /* 老板报「在调试面板时还会计时」。
-   * 根因：showView 不管 phase —— 从学习页点齿轮进调试面板，phase 还留在 'learning'。
-   * 同一个洞还有两处：退回首页照走；刷新页面后 loadState 把 reviewing 恢复成
-   * learning，人落在首页也在白记账。 */
+  /* 老板报过两件事，同源：
+   * ①「在调试面板时还会计时」—— showView 不管 phase，从学习页点齿轮进去，phase 还留在 learning。
+   *   同一个洞还有两处：退回首页照走；刷新后 loadState 把 reviewing 恢复成 learning。
+   * ②「回顾中点开设置，返回却掉到分组页」—— 返回按钮硬编码 goTo('view-home')，压根没记来路。
+   * 现在：进设置记 settingsFrom，返回按来路还原视图 + phase。 */
   for (const k in storageMap) delete storageMap[k];   // 干净起步
   els = {};
   bootApp();
@@ -679,35 +680,75 @@ console.log('\n[15] 只有停在学习页才计时（回归）');
     '学习页：60 秒正常计入（+' + Math.round((snap().netStudyMs - t0) / 1000) + ' 秒）');
 
   press('btnDebug');
-  ok(isActive('view-debug'), '从学习页进入调试面板');
+  ok(isActive('view-debug'), '从学习页进入设置面板');
   const t1 = snap().netStudyMs;
   flowTime(120000);
-  eq(snap().netStudyMs, t1, '调试面板：待 120 秒不计入');
+  eq(snap().netStudyMs, t1, '设置面板：待 120 秒不计入');
 
   press('btnBackHome2');
-  ok(isActive('view-home'), '从调试面板退回首页');
+  ok(isActive('view-study'), '设置返回 → 回到来路（学习页），不再一律扔回首页');
   const t2 = snap().netStudyMs;
+  flowTime(60000);
+  ok(snap().netStudyMs > t2, '返回学习页后计时恢复（phase 已置回 learning）');
+
+  // 首页 → 设置 → 返回：应回首页
+  press('btnExitStudy');
+  ok(isActive('view-home'), '退出学习页回首页');
+  const t3 = snap().netStudyMs;
   flowTime(120000);
-  eq(snap().netStudyMs, t2, '首页：待 120 秒不计入');
+  eq(snap().netStudyMs, t3, '首页：待 120 秒不计入');
+  press('btnDebug');
+  ok(isActive('view-debug'), '从首页进入设置面板');
+  press('btnBackHome2');
+  ok(isActive('view-home'), '从首页进来的 → 返回还是首页');
 
   press('btnContinue');
-  const t3 = snap().netStudyMs;
+  const t4 = snap().netStudyMs;
   flowTime(60000);
-  ok(snap().netStudyMs > t3, '点「继续背诵」回到学习页 → 计时恢复');
+  ok(snap().netStudyMs > t4, '点「继续背诵」回到学习页 → 计时恢复');
 
   // 刷新页面：落在首页，不该接着走表
   const beforeReload = snap().netStudyMs;
   els = {};
   bootApp();
   eq(snap().netStudyMs, beforeReload, '刷新后净学习时长原样恢复');
-  const t4 = snap().netStudyMs;
+  const t5 = snap().netStudyMs;
   flowTime(120000);
-  eq(snap().netStudyMs, t4, '刷新后落在首页：待 120 秒不计入');
+  eq(snap().netStudyMs, t5, '刷新后落在首页：待 120 秒不计入');
 
   press('btnContinue');
-  const t5 = snap().netStudyMs;
+  const t6 = snap().netStudyMs;
   flowTime(60000);
-  ok(snap().netStudyMs > t5, '刷新后点「继续背诵」→ 计时恢复');
+  ok(snap().netStudyMs > t6, '刷新后点「继续背诵」→ 计时恢复');
+}
+
+console.log('\n[16] 回顾途中点开设置再返回，回到回顾页（老板报的 bug）');
+{
+  for (const k in storageMap) delete storageMap[k];
+  els = {};
+  bootApp();
+  press('btnContinue');
+
+  let guard = 0;
+  while (!isActive('view-review') && guard++ < 20) { flowTime(60000); click(getEl('card')); }
+  ok(isActive('view-review'), '触发回顾（' + getEl('reviewTag').textContent + '）');
+  const tag = getEl('reviewTag').textContent;
+  const total = reviewTotal();
+
+  press('btnDebug');
+  ok(isActive('view-debug'), '回顾中点齿轮进设置面板');
+  press('btnBackHome2');
+  ok(isActive('view-review'), '设置返回 → 回到回顾页，而不是分组（首页）页');
+  eq(getEl('reviewTag').textContent, tag, '回顾类型没丢：' + tag);
+  eq(reviewTotal(), total, '回顾队列长度没变：' + total + ' 词');
+  eq(FW.core.state.phase, 'reviewing', 'phase 恢复成 reviewing');
+
+  // 关键：回到回顾页后还能正常走完、正常收尾
+  for (let i = 0; i < total; i++) press('btnNextR');
+  ok(isActive('view-result'), '返回后回顾仍能正常做完');
+  press('btnResContinue');
+  ok(isActive('view-study'), '回顾收尾后回到学习页');
+  eq(FW.core.state.phase, 'learning', '回顾做完 phase 回到 learning（表能走）');
 }
 
 console.log('\n----------------------------------------');

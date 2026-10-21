@@ -174,6 +174,16 @@ function showView(name) {
   if (name === 'view-debug') renderDebug();
 }
 
+/* 当前停在哪个视图。设置页（齿轮在顶栏，任何页面都能点）要靠它记住来路，
+ * 返回时才能回到原页面而不是一律扔回首页。 */
+function currentViewName() {
+  for (let i = 0; i < VIEWS.length; i++) {
+    const el = $(VIEWS[i]);
+    if (el && el.classList.contains('active')) return VIEWS[i];
+  }
+  return null;
+}
+
 /* ==================== 首页 ==================== */
 function renderHome() {
   const g = curGroup();
@@ -563,6 +573,7 @@ setNotifier(renderToastDom);
     $: $,
     VIEWS: VIEWS,
     buildStamp: buildStamp,
+    currentViewName: currentViewName,
     diagLine: diagLine,
     diagTest: diagTest,
     groupTitle: groupTitle,

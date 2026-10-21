@@ -51,6 +51,7 @@
 
   /* —— 依赖 view 层 —— */
   var $ = FW.view.$;
+  var currentViewName = FW.view.currentViewName;
   var diagTest = FW.view.diagTest;
   var libCount = FW.view.libCount;
   var renderAuto = FW.view.renderAuto;
@@ -510,8 +511,8 @@ function bind() {
   on('btnResContinue', 'click', resultContinue);
 
   // 调试
-  on('btnDebug', 'click', function () { goTo('view-debug'); });
-  on('btnBackHome2', 'click', function () { goTo('view-home'); });
+  on('btnDebug', 'click', openSettings);
+  on('btnBackHome2', 'click', closeSettings);
   eachOf('#segScale button', function (b) {
     b.addEventListener('click', function () {
       state.settings.timeScale = Number(b.dataset.v);
@@ -530,6 +531,7 @@ function bind() {
     if (!confirm('清空全部数据并重置到初始状态？')) return;
     store.removeItem(STORAGE_KEY);
     replaceState(defaultState());
+    settingsFrom = null;          // 来路已作废，别留着指向刚被清掉的回顾页
     initWords(true);
     goTo('view-home');
     toast('已重置');
@@ -567,6 +569,37 @@ function bind() {
 /* 重置计时基准。app 层启动时要调（跨层写原始值，所以做成函数） */
 function resetClock() { lastTick = performance.now(); }
 
+/* ==================== 设置面板（记来路，按来路返回） ==================== */
+/* 齿轮按钮常驻顶栏，学习 / 回顾 / 结果页都能点进去。
+ * 老板报过：回顾途中点齿轮再点返回，人被扔回分组（首页）页，回顾只能重来。
+ * 早先的返回是硬编码 goTo('view-home')，没记来路。
+ * phase 必须跟着一起还原：goTo 离开学习页会把 learning 置 idle（停表），
+ * 返回学习页若不置回 learning，表就永远走不动了；reviewing 同理。 */
+let settingsFrom = null;
+
+function openSettings() {
+  const from = currentViewName();
+  if (from && from !== 'view-debug') settingsFrom = from;   // 在设置页再点一次齿轮不算来路
+  goTo('view-debug');
+}
+
+function closeSettings() {
+  const from = settingsFrom || 'view-home';
+  settingsFrom = null;
+
+  if (from === 'view-review') {
+    if (!ui.review) { goTo('view-home'); return; }   // 回顾已经收尾了，别硬回空壳页
+    state.phase = 'reviewing';
+    lastTick = performance.now();
+    saveSoon();
+  } else if (from === 'view-study') {
+    state.phase = 'learning';
+    lastTick = performance.now();
+    saveSoon();
+  }
+  goTo(from);
+}
+
 /* 切换视图的唯一入口。
  * 「离开学习页就停表」放在这里而不是 view 里 —— 改业务状态是 controller 的职责，
  * view 只负责把界面画出来（那条规矩由 tests/layers-test.js 盯着）。 */
@@ -582,6 +615,7 @@ function goTo(name) {
     advance: advance,
     attachSwipe: attachSwipe,
     bind: bind,
+    closeSettings: closeSettings,
     continueStudy: continueStudy,
     eachOf: eachOf,
     finishGroup: finishGroup,
@@ -593,6 +627,7 @@ function goTo(name) {
     loadLibSection: loadLibSection,
     on: on,
     openGroup: openGroup,
+    openSettings: openSettings,
     resetClock: resetClock,
     resultContinue: resultContinue,
     resumeAfterReview: resumeAfterReview,
