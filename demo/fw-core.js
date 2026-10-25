@@ -55,7 +55,7 @@ function defaultState() {
     t1Baseline: 0,        // 上次 T1 回顾完成时的 learnedLog 长度
     lastT2AtNetMs: 0,
     lastT3AtNetMs: 0,
-    activeReview: null,   // 正在进行中的回顾类型（'T1'/'T2'/'T3'），刷新页面后据此结算，避免重复弹
+    activeReview: null,   // 进行中的回顾 { type:'T1'|'T2'|'T3', idx }；重开页面据此原样恢复（旧存档是裸字符串，靠 normalizeActiveReview 兼容）
     learnedLog: [],       // [{ id, group, atNetMs }] 按净学习时长打点
     progress: {},         // id -> { study, review, hard }
     groupDone: {},        // idx -> true
@@ -107,6 +107,21 @@ function replaceGroups(next) {
   Array.prototype.push.apply(groups, next || []);
 }
 
+/* activeReview 归一化成 { type, idx }。
+ * 旧存档里是裸字符串 'T3'（只记类型、没有进度），当成第 0 个继续。
+ * 不用改数据结构就能向前兼容 —— 读旧盘不会炸。 */
+const REVIEW_TYPES = ['T1', 'T2', 'T3'];
+function normalizeActiveReview(v) {
+  if (!v) return null;
+  if (typeof v === 'string') {
+    return REVIEW_TYPES.indexOf(v) >= 0 ? { type: v, idx: 0 } : null;
+  }
+  if (typeof v === 'object' && REVIEW_TYPES.indexOf(v.type) >= 0) {
+    return { type: v.type, idx: Math.max(0, Math.floor(Number(v.idx) || 0)) };
+  }
+  return null;
+}
+
   FW.core = {
     CLICK_PX: CLICK_PX,
     GROUP_COUNT: GROUP_COUNT,
@@ -122,6 +137,7 @@ function replaceGroups(next) {
     fmt: fmt,
     fmtReviewSpan: fmtReviewSpan,
     groups: groups,
+    normalizeActiveReview: normalizeActiveReview,
     replaceGroups: replaceGroups,
     replaceState: replaceState,
     setNotifier: setNotifier,

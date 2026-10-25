@@ -103,7 +103,13 @@ function click(el) {
 }
 function press(id) { getEl(id).__listeners.click[0](); }
 function isActive(id) { return getEl(id).classList.contains('active'); }
-function reviewTotal() { return Number(getEl('rcardCounter').textContent.split('/')[1].trim()); }
+/* 回顾总词数。元素空着时返回 NaN 而不是抛异常 —— 断言失败要能干净报出来，
+ * 不要让一个 TypeError 把后面的用例全带走。 */
+function reviewTotal() {
+  const parts = String(getEl('rcardCounter').textContent || '').split('/');
+  return parts.length > 1 ? Number(parts[1].trim()) : NaN;
+}
+
 function saved() { return JSON.parse(storageMap['fwords.state.v1']); }
 function selectLib(key) {
   getEl('libSelect').value = key;
@@ -749,6 +755,64 @@ console.log('\n[16] 回顾途中点开设置再返回，回到回顾页（老板
   press('btnResContinue');
   ok(isActive('view-study'), '回顾收尾后回到学习页');
   eq(FW.core.state.phase, 'learning', '回顾做完 phase 回到 learning（表能走）');
+}
+
+/* 老板报的 bug：手机端回顾中切后台 / 按返回键，页面被系统回收，重开后回不到回顾模式。
+ * 根因是 boot 里只有「结算跳过」一条路：ui.review 不持久化，就干脆当成中断作废。
+ * 现在 activeReview 存 { type, idx }，回顾期间停表 + learnedLog 不动 → 词表可重算。 */
+console.log('\n[17] 回顾中途页面被杀 → 重开回到原来那一个词（老板报的 bug）');
+{
+  for (const k in storageMap) delete storageMap[k];
+  els = {};
+  bootApp();
+  press('btnContinue');
+
+  let guard = 0, hit = false;
+  while (guard++ < 300) {
+    if (isActive('view-review')) {
+      if (/^T3/.test(getEl('reviewTag').textContent)) { hit = true; break; }
+      const n = reviewTotal();
+      for (let i = 0; i < n; i++) press('btnNextR');      // 中途的 T1/T2 照常做完
+      if (isActive('view-result')) press('btnResContinue');
+      continue;
+    }
+    if (isActive('view-result')) { press('btnResContinue'); continue; }
+    if (!isActive('view-study')) break;
+    flowTime(150000);
+    click(getEl('card'));
+  }
+  ok(hit, '构造出 T3 回顾（' + (hit ? getEl('reviewTag').textContent : '没跑到') + '）');
+  const total = reviewTotal();
+
+  // ① 旧存档兼容：老版本 activeReview 只存裸字符串
+  const st1 = saved();
+  st1.activeReview = 'T3';
+  storageMap['fwords.state.v1'] = JSON.stringify(st1);
+  els = {}; bootApp();
+  ok(isActive('view-review'), '旧存档（activeReview 是字符串）重启后仍回到回顾页');
+  eq(getEl('reviewTag').textContent, 'T3 · 每 30 分钟', '回顾类型没丢');
+  eq(reviewTotal(), total, '词表按类型重算，长度一致：' + total);
+  eq(FW.core.state.phase, 'reviewing', 'phase = reviewing（回顾中表是停的）');
+
+  // ② 看到第 4 个再被系统杀掉
+  for (let i = 0; i < 3; i++) press('btnNextR');
+  saveFn();
+  eq(getEl('rcardCounter').textContent, '4 / ' + total, '被杀前停在第 4 个');
+  const ar = saved().activeReview;
+  ok(ar && ar.type === 'T3' && ar.idx === 3,
+    'activeReview 落盘成 { type:T3, idx:3 }', JSON.stringify(ar));
+
+  els = {}; bootApp();
+  ok(isActive('view-review'), '重启后回到回顾页');
+  eq(getEl('rcardCounter').textContent, '4 / ' + total, '从第 4 个继续，不是从头再来');
+  eq(FW.core.state.phase, 'reviewing', 'phase 仍是 reviewing');
+
+  // ③ 做完了就不该再弹
+  for (let i = 3; i < total; i++) press('btnNextR');
+  ok(isActive('view-result'), '剩余词看完 → 结果页');
+  eq(saved().activeReview, null, '完成后 activeReview 清空');
+  els = {}; bootApp();
+  ok(!isActive('view-review'), '做完后重启不会再弹回顾');
 }
 
 console.log('\n----------------------------------------');

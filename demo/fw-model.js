@@ -393,7 +393,7 @@ function loadState() {
     delete state.sourceOffset;
     // 重开页面一定落在首页 —— 先停表，点「继续背诵」才恢复计时。
     // （以前这里把 reviewing 恢复成 learning，结果在首页干坐着也在累加时长。）
-    // 未做完的回顾由 state.activeReview 在 boot 里结算。
+    // 未做完的回顾由 app.boot 按 state.activeReview 重建（词表可重算，位置也记着）
     state.phase = 'idle';
     return true;
   } catch (e) {

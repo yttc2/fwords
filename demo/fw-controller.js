@@ -189,7 +189,10 @@ function advance(dir) {
   renderStudy();
 }
 
-function startReview(type) {
+/* fromIdx：断点续看用（重开页面恢复回顾时从上次那一个词继续）。
+ * 回顾期间 netStudyMs 停表、learnedLog 也不动，所以 reviewEntries(type) 是幂等的 ——
+ * 只要存下 type + idx，重开页面能算出完全一样的词表。 */
+function startReview(type, fromIdx) {
   const list = reviewEntries(type);
   if (!list.length) {
     // 窗口内没有词（例如 5 分钟内还没学任何新词）→ 顺延，避免空回顾
@@ -201,9 +204,10 @@ function startReview(type) {
     return;
   }
 
+  const idx = Math.max(0, Math.min(Math.floor(fromIdx) || 0, list.length - 1));
   state.phase = 'reviewing';
-  state.activeReview = type;      // 落盘；刷新/中断后可据此结算
-  ui.review = { type: type, list: list, idx: 0, flipped: false, t0: performance.now() };
+  state.activeReview = { type: type, idx: idx };   // 落盘：类型 + 看到第几个
+  ui.review = { type: type, list: list, idx: idx, flipped: false, t0: performance.now() };
   saveNow();
   goTo('view-review');
   renderReview();
@@ -222,6 +226,18 @@ function flipCard() {
   $('rcardHint').textContent = '左滑或点「下一个」→ 继续　·　右滑 → 上一个';
 }
 
+/* 把进度同步进 state.activeReview —— 切后台被杀掉时，重开页面才知道停在哪 */
+function syncReviewCursor() {
+  const r = ui.review;
+  if (!r) return;
+  if (!state.activeReview || typeof state.activeReview !== 'object') {
+    state.activeReview = { type: r.type, idx: r.idx };
+  } else {
+    state.activeReview.type = r.type;
+    state.activeReview.idx = r.idx;
+  }
+}
+
 /* 回顾不判断「认识 / 不认识」：看过就往下走，只推进游标。
  * 卡片未翻面时点击先翻面，已翻面后点击再前进。 */
 function reviewNext() {
@@ -232,8 +248,9 @@ function reviewNext() {
     const p = state.progress[e.id] || (state.progress[e.id] = { study: 0, review: 0 });
     p.review++;
   }
-  saveSoon();
   r.idx++;
+  syncReviewCursor();
+  saveSoon();
   if (r.idx >= r.list.length) finishReview();
   else renderReview();
 }
@@ -242,6 +259,8 @@ function reviewPrev() {
   const r = ui.review;
   if (!r || r.idx <= 0) return;
   r.idx--;
+  syncReviewCursor();
+  saveSoon();
   renderReview();
 }
 
@@ -530,6 +549,7 @@ function bind() {
   on('btnReset', 'click', function () {
     if (!confirm('清空全部数据并重置到初始状态？')) return;
     store.removeItem(STORAGE_KEY);
+    ui.review = null;             // 回顾残留得一起清，否则 closeSettings 还会往回顾页回
     replaceState(defaultState());
     settingsFrom = null;          // 来路已作废，别留着指向刚被清掉的回顾页
     initWords(true);
