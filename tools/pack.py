@@ -124,6 +124,15 @@ def main(argv=None):
                 f.write(EMPTY_USER_JS)
             stripped.append((name, size if had else 0))
 
+    # 防呆：源目录里本来就没有私有词库（干净 clone 的仓库就是这样）。
+    # 这种情况下 --clean 是「无中生有」一个空壳，覆盖到站点根会把线上已有的词库冲掉。
+    if clean and not os.path.isfile(os.path.join(SRC, PRIVATE_FILES[0])):
+        print("")
+        print("  !! 源目录里没有 %s（干净 clone 的仓库本来就没有）。" % PRIVATE_FILES[0])
+        print("     此时 --clean 是凭空造一个空壳。直接 cp 到站点根，会覆盖掉线上已有的词库！")
+        print("     线上部署请去掉 --clean：dist 里没有这个文件，cp 不会动站点根那一份。")
+        print("")
+
     items = collect(stage)
     if not items:
         print("源目录为空: %s" % SRC)
