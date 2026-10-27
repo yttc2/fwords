@@ -318,7 +318,7 @@ function updateStatusBar() {
   }
 
   if ($('view-debug').classList.contains('active')) {
-    $('dbgCounters').textContent = 'T1 ' + (state.learnedLog.length - state.t1Baseline) + '/6 · T2 ' +
+    $('dbgCounters').textContent = 'T1 ' + state.t1Seen + '/6 · T2 ' +
       fmt(state.netStudyMs - state.lastT2AtNetMs) + '/05:00 · T3 ' + fmt(state.netStudyMs - state.lastT3AtNetMs) + '/30:00';
   }
 }

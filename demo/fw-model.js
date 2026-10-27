@@ -186,7 +186,7 @@ function applyWordList(text, name, libKey, libOffsetTo, opts) {
   state.groupDone = {};
   state.learnedLog = [];
   state.netStudyMs = 0;
-  state.t1Baseline = 0;
+  state.t1Seen = 0;
   state.lastT2AtNetMs = 0;
   state.lastT3AtNetMs = 0;
   state.progress = {};
@@ -358,7 +358,6 @@ function saveNow() {
   state.savedAt = Date.now();
   if (state.learnedLog.length > LOG_CAP) {
     state.learnedLog = state.learnedLog.slice(-LOG_CAP);
-    state.t1Baseline = Math.max(0, state.t1Baseline - (state.learnedLog.length - LOG_CAP));
   }
   try {
     store.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -406,7 +405,7 @@ function pickTrigger() {
   if (!state.settings.reviewEnabled) return null;
   if (state.netStudyMs - state.lastT3AtNetMs >= T3_MS) return 'T3';
   if (state.netStudyMs - state.lastT2AtNetMs >= T2_MS) return 'T2';
-  if (state.learnedLog.length - state.t1Baseline >= T1_WORDS) return 'T1';
+  if (state.t1Seen >= T1_WORDS) return 'T1';
   return null;
 }
 
@@ -422,14 +421,37 @@ function byId(id) {
   return null;
 }
 
+/* 记一个词「看过了」。
+ *
+ * 两个计数器口径不同，别混：
+ *   learnedLog —— 学过的**不同词**，每词一条（去重键 id + 分组），用来算覆盖率和 T2/T3 窗口；
+ *   t1Seen     —— 自上次 T1 以来**又看了几个**（重背旧词也算），T1 的唯一判据。
+ *
+ * 为什么 T1 不能拿 learnedLog 的长度当判据（踩过）：
+ *   重背已经学过的组时，每个词都在 learnedLog 里 → 长度一动不动 → 「每 6 个词回顾一次」
+ *   彻底哑掉，一路学下去一次都不弹。老板 2026-10-27 报的就是这个。
+ *
+ * 为什么重背时要把条目挪到末尾：
+ *   T1 回顾取的是 learnedLog 最近 6 条。不挪的话，重背第 1 个词时取到的还是很久以前
+ *   那批词，复习的完全不是刚看的东西。
+ */
 function markLearned(word) {
   const g = state.groupIndex;
-  for (let i = 0; i < state.learnedLog.length; i++) {
-    if (state.learnedLog[i].id === word.id && state.learnedLog[i].group === g) return false;
-  }
-  state.learnedLog.push({ id: word.id, group: g, atNetMs: state.netStudyMs });
   const p = state.progress[word.id] || (state.progress[word.id] = { study: 0, review: 0, hard: 0 });
   p.study++;
+  state.t1Seen++;
+
+  for (let i = 0; i < state.learnedLog.length; i++) {
+    const e = state.learnedLog[i];
+    if (e.id === word.id && e.group === g) {
+      state.learnedLog.splice(i, 1);
+      e.atNetMs = state.netStudyMs;
+      state.learnedLog.push(e);
+      saveSoon();
+      return false;     // 不是新词（已学过），但确实又看了一遍
+    }
+  }
+  state.learnedLog.push({ id: word.id, group: g, atNetMs: state.netStudyMs });
   saveSoon();
   return true;
 }
@@ -439,23 +461,23 @@ function markLearned(word) {
 /* 回顾计数器复位。一次回顾（做完 / 中断 / 窗口为空顺延）都必须推进对应计数器，
  * 否则同一次回顾会反复弹。
  *
- * 为什么 T2、T3 要连同 t1Baseline 一起推进：
+ * 为什么 T2、T3 要连同 T1 的计数一起清零：
  *   三种回顾复习的是**同一批词的不同切法** —— T1 取最近 6 个词，T2 取最近 5 分钟的词。
  *   慢节奏下（比如 60 秒/词）T2 在第 5 个词就到点，复习掉第 1~5 个词；此时 T1 的
  *   「满 6 词」只差 1 个 → 切下一个词立刻弹 T1，复习的还是刚看过的那批词。
- *   所以 T2/T3 完成后要把 T1 的起点推到当前进度：「这些词刚复习过，重新起算」。
+ *   所以 T2/T3 完成后要把 T1 的计数归零：「这些词刚复习过，重新起算」。
  *   这和「T3 完成后连 T2 一起复位」是同一条道理，只是方向反过来。
  */
 function settleReview(type) {
   if (type === 'T1') {
-    state.t1Baseline = state.learnedLog.length;
+    state.t1Seen = 0;
   } else if (type === 'T2') {
     state.lastT2AtNetMs = state.netStudyMs;
-    state.t1Baseline = state.learnedLog.length;
+    state.t1Seen = 0;
   } else if (type === 'T3') {
     state.lastT3AtNetMs = state.netStudyMs;
     state.lastT2AtNetMs = state.netStudyMs;
-    state.t1Baseline = state.learnedLog.length;
+    state.t1Seen = 0;
   }
 }
 

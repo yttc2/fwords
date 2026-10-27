@@ -815,6 +815,44 @@ console.log('\n[17] 回顾中途页面被杀 → 重开回到原来那一个词�
   ok(!isActive('view-review'), '做完后重启不会再弹回顾');
 }
 
+/* 老板 2026-10-27 报的 bug：学完 6 个词不回顾，直接往下学。
+ * 根因是 T1 拿「learnedLog 的长度」当判据 —— learnedLog 按词去重（id + 分组），
+ * 重背已经学过的组时长度一动不动，于是「每 6 个词回顾一次」彻底哑掉。 */
+console.log('\n[18] 重背已经学过的组：每 6 个词照样弹 T1（老板报的 bug）');
+{
+  for (const k in storageMap) delete storageMap[k];
+  els = {};
+  bootApp();
+  press('btnContinue');
+
+  // 先把组 1 的 12 个词过一遍（中途会弹 T1，照常做完）
+  let guard = 0;
+  while (guard++ < 40 && FW.core.state.learnedLog.length < 12) {
+    if (isActive('view-study')) click(getEl('card'));
+    else settle();
+  }
+  settle();     // 第 12 个词会同时触发 T1：把它做完，t1Seen 才会归零
+  eq(FW.core.state.learnedLog.length, 12, '组 1 的 12 个词都进过 learnedLog');
+  eq(FW.core.state.t1Seen, 0, '上一轮 T1 已结算，计数归零');
+
+  // 从头重背这一组：游标归零 + 重新进入
+  FW.core.state.cursors[0] = 0;
+  FW.controller.openGroup(0);
+  ok(isActive('view-study'), '重进组 1，从第 1 个词开始');
+  eq(getEl('cardWord').textContent, 'abandon', '首词回到组内第一个');
+
+  for (let i = 0; i < 5; i++) click(getEl('card'));
+  ok(isActive('view-study'), '重背到第 5 个词还没被打断');
+  eq(FW.core.state.learnedLog.length, 12, '重背不新增日志条目（去重生效）');
+
+  click(getEl('card'));
+  ok(isActive('view-review'), '重背完第 6 个词 → 照样弹 T1');
+  eq(getEl('reviewTag').textContent, 'T1 · 每 6 个单词', '类型 = T1');
+  eq(reviewTotal(), 6, '回顾正好 6 个词');
+  eq(getEl('rcardWord').textContent, 'abandon', '复习的是刚重背的这 6 个，不是很久以前那批');
+  eq(FW.core.state.t1Seen, 6, 't1Seen 累计到 6');
+}
+
 console.log('\n----------------------------------------');
 console.log('通过 ' + pass + ' 项，失败 ' + fail + ' 项');
 console.log('----------------------------------------\n');

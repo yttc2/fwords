@@ -52,7 +52,7 @@ function defaultState() {
     cursors: {},          // 每个分组的游标
     netStudyMs: 0,        // 累计净学习时长（唯一时间轴）
     phase: 'idle',        // idle | learning | reviewing
-    t1Baseline: 0,        // 上次 T1 回顾完成时的 learnedLog 长度
+    t1Seen: 0,            // 自上次 T1 结算以来「又看了几个词」（重背旧词也算）—— T1 的唯一判据
     lastT2AtNetMs: 0,
     lastT3AtNetMs: 0,
     activeReview: null,   // 进行中的回顾 { type:'T1'|'T2'|'T3', idx }；重开页面据此原样恢复（旧存档是裸字符串，靠 normalizeActiveReview 兼容）
