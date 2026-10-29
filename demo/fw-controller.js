@@ -51,6 +51,7 @@
 
   /* —— 依赖 view 层 —— */
   var $ = FW.view.$;
+  var applyFontSize = FW.view.applyFontSize;
   var currentViewName = FW.view.currentViewName;
   var diagTest = FW.view.diagTest;
   var libCount = FW.view.libCount;
@@ -555,6 +556,17 @@ function bind() {
     initWords(true);
     goTo('view-home');
     toast('已重置');
+  });
+
+  // 字体大小：小 / 中 / 大。只切 <html data-fs>，像素值在 style.css 的变量里
+  eachOf('#segFont button', function (b) {
+    b.addEventListener('click', function () {
+      state.settings.fontSize = b.dataset.v;
+      applyFontSize();
+      renderDebug();
+      saveSoon();
+      toast('字体大小：' + (b.dataset.v === 'sm' ? '小' : b.dataset.v === 'md' ? '中' : '大'));
+    });
   });
 
   // 自动发音：学习页卡片下的开关 + 调试面板段控件，同一份状态

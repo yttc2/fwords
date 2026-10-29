@@ -29,6 +29,7 @@
   var stopSpeak = FW.speech.stopSpeak;
 
   /* —— 依赖 view 层 —— */
+  var applyFontSize = FW.view.applyFontSize;
   var renderHome = FW.view.renderHome;
   var reviewTypeLabel = FW.view.reviewTypeLabel;
   var runDiag = FW.view.runDiag;
@@ -43,6 +44,7 @@
 function boot() {
   const restored = loadState();
   initWords(false);
+  applyFontSize();   // 先把字号挂上，别等用户进设置才生效
 
   // 上次是「回顾中途」被切后台杀掉 / 关闭 / 刷新 —— ui.review 不持久化，
   // 但 state.activeReview 里有类型和进度，能原样重建（回顾停表，词表可重算）。

@@ -853,6 +853,33 @@ console.log('\n[18] 重背已经学过的组：每 6 个词照样弹 T1（老板
   eq(FW.core.state.t1Seen, 6, 't1Seen 累计到 6');
 }
 
+/* 设置面板的「字体大小」是纯表现层的东西，但「选完记不住」是很常见的坑，
+ * 所以落盘 + 重启恢复这条链必须钉住。 */
+console.log('\n[19] 字体大小设置：默认大、能落盘、重启后还在');
+{
+  for (const k in storageMap) delete storageMap[k];
+  els = {};
+  bootApp();
+
+  eq(FW.core.state.settings.fontSize, 'lg', '默认「大」');
+
+  // 桩里的 querySelectorAll 恒返回空数组，拿不到段按钮 → 直接改状态再走应用
+  FW.core.state.settings.fontSize = 'md';
+  FW.view.applyFontSize();
+  eq(FW.core.state.settings.fontSize, 'md', '切到「中」');
+
+  FW.model.saveNow();
+  eq(saved().settings.fontSize, 'md', '已落盘');
+
+  els = {};
+  bootApp();
+  eq(FW.core.state.settings.fontSize, 'md', '重启后仍是「中」');
+
+  FW.core.state.settings.fontSize = 'xx';
+  FW.view.applyFontSize();
+  eq(FW.core.state.settings.fontSize, 'lg', '非法值回落到「大」，不会把页面搞成没字号');
+}
+
 console.log('\n----------------------------------------');
 console.log('通过 ' + pass + ' 项，失败 ' + fail + ' 项');
 console.log('----------------------------------------\n');

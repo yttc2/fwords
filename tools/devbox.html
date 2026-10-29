@@ -63,23 +63,6 @@
   button.primary:hover { background: #255ed6; border-color: #255ed6; }
   .hint { font-size: 12px; color: var(--text2); }
 
-  /* ---------- 字号调节 ---------- */
-  .typo {
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    padding: 6px 12px;
-    background: #f7f9fc;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-  }
-  .typo-label { font-size: 12px; color: var(--accent); font-weight: 600; letter-spacing: .3px; }
-  .typo .field { gap: 5px; }
-  .typo input[type="range"] { width: 84px; }
-  .typo .num {
-    display: inline-block; min-width: 30px; text-align: right;
-    font-size: 12px; font-weight: 600; color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }
-  .divider { width: 1px; height: 22px; background: var(--line); flex: none; }
   .group { display: flex; align-items: center; gap: 12px; flex: none; }
 
   /* ---------- 舞台 ---------- */
@@ -159,24 +142,6 @@
 <header class="bar">
   <div class="title">Fwords 调试台<span>改完代码点「刷新」即可</span></div>
 
-  <div class="typo">
-    <span class="typo-label">字号</span>
-    <label class="field">单词
-      <input id="fWord" type="range" min="24" max="72" step="1">
-      <b class="num" id="vWord"></b>
-    </label>
-    <label class="field">音标
-      <input id="fPhon" type="range" min="11" max="32" step="1">
-      <b class="num" id="vPhon"></b>
-    </label>
-    <label class="field">释义
-      <input id="fMean" type="range" min="14" max="40" step="1">
-      <b class="num" id="vMean"></b>
-    </label>
-    <button id="copyCss" title="把当前字号复制成 CSS，贴回 style.css 就能固化">复制 CSS</button>
-    <button id="resetTypo" title="回到 style.css 里的原始值">重置</button>
-  </div>
-
   <div class="group">
     <label class="field">设备
       <select id="preset"></select>
@@ -225,7 +190,7 @@
   var frame = $('frame'), iframe = $('app'), stage = $('stage');
   var wIn = $('w'), hIn = $('h'), zoomIn = $('zoom'), zoomVal = $('zoomVal'), presetSel = $('preset');
 
-  var st = { w: 390, h: 844, zoom: 85, clean: false, typo: { word: 56, phon: 24, mean: 30 } };
+  var st = { w: 390, h: 844, zoom: 85, clean: false };
 
   /* ---------- 存取 ---------- */
   function load() {
@@ -238,12 +203,6 @@
         if (+o.h) st.h = +o.h;
         if (+o.zoom) st.zoom = +o.zoom;
         st.clean = !!o.clean;
-        if (o.typo && typeof o.typo === 'object') {
-          ['word', 'phon', 'mean'].forEach(function (k) {
-            var v = +o.typo[k];
-            if (v > 0) st.typo[k] = v;
-          });
-        }
       }
     } catch (e) { /* 隐私模式忽略 */ }
   }
@@ -305,82 +264,9 @@
     g.addEventListener('pointercancel', up);
   });
 
-  /* ---------- 字号调节 ---------- */
-  var TYPO_DEFAULT = { word: 56, phon: 24, mean: 30 };   // 对应 style.css 里的现值
-  var fWord = $('fWord'), fPhon = $('fPhon'), fMean = $('fMean');
-  var vWord = $('vWord'), vPhon = $('vPhon'), vMean = $('vMean');
-
-  /* 把字号注进 iframe：不动源码，只在它的文档里塞一个 <style>。
-   * iframe 每次刷新都会丢掉，所以还要挂在 load 上重新注入。 */
-  function applyTypo() {
-    var doc;
-    try { doc = iframe.contentDocument; } catch (e) { return; }
-    if (!doc || !doc.head) return;
-    var el = doc.getElementById('__devbox_typo');
-    if (!el) {
-      el = doc.createElement('style');
-      el.id = '__devbox_typo';
-      doc.head.appendChild(el);
-    }
-    var t = st.typo;
-    el.textContent =
-      '.word{font-size:' + t.word + 'px !important}' +
-      '.phonetic{font-size:' + t.phon + 'px !important}' +
-      '.meaning{font-size:' + t.mean + 'px !important}' +
-      '.meaning.hidden{font-size:' + hintSize() + 'px !important}';
-  }
-  function hintSize() { return Math.max(12, Math.round(st.typo.mean * 0.72)); }
-
-  function renderTypo() {
-    fWord.value = st.typo.word; vWord.textContent = st.typo.word + 'px';
-    fPhon.value = st.typo.phon; vPhon.textContent = st.typo.phon + 'px';
-    fMean.value = st.typo.mean; vMean.textContent = st.typo.mean + 'px';
-  }
-
-  function onTypo(key, input) {
-    input.addEventListener('input', function () {
-      st.typo[key] = +input.value;
-      renderTypo(); applyTypo(); save();
-    });
-  }
-  onTypo('word', fWord);
-  onTypo('phon', fPhon);
-  onTypo('mean', fMean);
-
-  $('resetTypo').addEventListener('click', function () {
-    st.typo = { word: TYPO_DEFAULT.word, phon: TYPO_DEFAULT.phon, mean: TYPO_DEFAULT.mean };
-    renderTypo(); applyTypo(); save();
-    toast('已回到 style.css 的原始字号');
-  });
-
-  $('copyCss').addEventListener('click', function () {
-    var t = st.typo;
-    var css =
-      '.word { font-size: ' + t.word + 'px; }\n' +
-      '.phonetic { font-size: ' + t.phon + 'px; }\n' +
-      '.meaning { font-size: ' + t.mean + 'px; line-height: 1.65; }\n' +
-      '.meaning.hidden { font-size: ' + hintSize() + 'px; }';
-    copyText(css, 'CSS 已复制 · 贴回 demo/style.css 就固化了');
-  });
-
-  function copyText(text, okMsg) {
-    function fallback() {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed'; ta.style.top = '-999px'; ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      var done = false;
-      try { done = document.execCommand('copy'); } catch (e) {}
-      document.body.removeChild(ta);
-      toast(done ? okMsg : '复制被拦，手动抄：' + text.replace(/\n/g, ' | '));
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () { toast(okMsg); }, fallback);
-    } else { fallback(); }
-  }
-
-  iframe.addEventListener('load', function () { applyTypo(); });
+  /* 字号不在这里调 —— App 设置面板里已经有「小 / 中 / 大」三档，
+   * 调试台再叠一层 !important 覆盖会和它打架（点了「小」却不生效）。
+   * 这里只负责容器尺寸和设备模拟。 */
 
   /* ---------- 控件 ---------- */
   PRESETS.forEach(function (p) {
@@ -437,18 +323,18 @@
   if (/[?&]clean=1/.test(location.search)) st.clean = true;
 
   // ?page=study 自动点「继续背诵」进学习页 —— 调卡片字号时不用每次手点
-  if (/[?&]page=study/.test(location.search)) {
+  // ?page=debug 直接进设置面板
+  var wantPage = (/[?&]page=(study|debug)/.exec(location.search) || [])[1];
+  if (wantPage) {
     iframe.addEventListener('load', function () {
       var d;
       try { d = iframe.contentDocument; } catch (e) { return; }
-      var btn = d && d.getElementById('btnContinue');
+      var btn = d && d.getElementById(wantPage === 'debug' ? 'btnDebug' : 'btnContinue');
       if (btn) btn.click();
     });
   }
 
   apply();
-  renderTypo();
-  applyTypo();
 
   // 首次打开发现 iframe 是空白的常见原因：file:// 下浏览器拦跨文档访问
   if (location.protocol === 'file:') {

@@ -63,6 +63,7 @@ function defaultState() {
       autoPlay: false,
       timeScale: 1,
       reviewEnabled: true,
+      fontSize: 'lg',        // 字体大小 sm 小 / md 中 / lg 大（学习和回顾页的单词·音标·释义）
       ttsSource: 'human',    // human 在线真人录音 | system 系统 TTS
       voiceAccent: 'us'      // us 美音 | uk 英音
     },

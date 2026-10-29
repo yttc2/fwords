@@ -523,6 +523,24 @@ function setAuto(on) {
     : '已关闭自动发音');
 }
 
+/* ==================== 字体大小 ==================== */
+const FONT_SIZES = ['sm', 'md', 'lg'];
+
+/* 只切 <html data-fs>，具体像素写在 style.css 的变量里 ——
+ * 一处切换，学习页和回顾页的单词 / 音标 / 释义一起变，不用重绘。 */
+function applyFontSize() {
+  if (FONT_SIZES.indexOf(state.settings.fontSize) < 0) state.settings.fontSize = 'lg';
+  if (typeof document !== 'undefined' && document.documentElement && document.documentElement.setAttribute) {
+    document.documentElement.setAttribute('data-fs', state.settings.fontSize);
+  }
+}
+
+function renderFontSize() {
+  document.querySelectorAll('#segFont button').forEach(function (b) {
+    b.classList.toggle('on', b.dataset.v === state.settings.fontSize);
+  });
+}
+
 function renderDebug() {
   document.querySelectorAll('#segScale button').forEach(function (b) {
     b.classList.toggle('on', Number(b.dataset.v) === state.settings.timeScale);
@@ -540,6 +558,7 @@ function renderDebug() {
   const bd = $('dbgBuild');
   if (bd) bd.textContent = buildStamp();
 
+  renderFontSize();
   renderAuto();
 }
 
@@ -572,6 +591,7 @@ setNotifier(renderToastDom);
   FW.view = {
     $: $,
     VIEWS: VIEWS,
+    applyFontSize: applyFontSize,
     buildStamp: buildStamp,
     currentViewName: currentViewName,
     diagLine: diagLine,
@@ -581,6 +601,7 @@ setNotifier(renderToastDom);
     renderAuto: renderAuto,
     renderDebug: renderDebug,
     renderDiag: renderDiag,
+    renderFontSize: renderFontSize,
     renderHome: renderHome,
     renderReview: renderReview,
     renderStudy: renderStudy,

@@ -16,7 +16,17 @@
   --red: #a32d2d;
   --red-soft: #fcebeb;
   --radius: 14px;
+
+  /* 字体大小：三档，由设置面板的「字体大小」切换（默认大）。
+     用变量而不是写死，切换时只动 <html data-fs>，不用重绘整个页面。 */
+  --fs-word: 56px;
+  --fs-phon: 24px;
+  --fs-mean: 30px;
+  --fs-hint: 22px;
 }
+
+:root[data-fs="md"] { --fs-word: 46px; --fs-phon: 20px; --fs-mean: 25px; --fs-hint: 18px; }
+:root[data-fs="sm"] { --fs-word: 38px; --fs-phon: 17px; --fs-mean: 21px; --fs-hint: 15px; }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -177,16 +187,16 @@ h3.sub { font-size: 13px; font-weight: 500; color: var(--text-2); margin: 18px 0
   padding: 10px 0;
 }
 .word {
-  font-size: 56px; font-weight: 500; letter-spacing: -1px;
+  font-size: var(--fs-word); font-weight: 500; letter-spacing: -0.02em;
   word-break: break-word; line-height: 1.15;
 }
-.phonetic { font-size: 24px; color: var(--text-3); margin-top: 10px; }
+.phonetic { font-size: var(--fs-phon); color: var(--text-3); margin-top: 10px; }
 .meaning {
-  font-size: 30px; line-height: 1.65; color: var(--text); margin-top: 18px;
+  font-size: var(--fs-mean); line-height: 1.65; color: var(--text); margin-top: 18px;
   padding-top: 16px; border-top: 1px dashed var(--border);
   width: 100%;
 }
-.meaning.hidden { color: var(--text-3); font-size: 22px; line-height: 1.4; border-top-style: dashed; }
+.meaning.hidden { color: var(--text-3); font-size: var(--fs-hint); line-height: 1.4; border-top-style: dashed; }
 .card-hint { text-align: center; font-size: 12px; color: var(--text-3); padding-top: 4px; }
 
 /* ---------- status bar ---------- */
