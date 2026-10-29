@@ -162,15 +162,15 @@
   <div class="typo">
     <span class="typo-label">字号</span>
     <label class="field">单词
-      <input id="fWord" type="range" min="24" max="56" step="1">
+      <input id="fWord" type="range" min="24" max="72" step="1">
       <b class="num" id="vWord"></b>
     </label>
     <label class="field">音标
-      <input id="fPhon" type="range" min="11" max="24" step="1">
+      <input id="fPhon" type="range" min="11" max="32" step="1">
       <b class="num" id="vPhon"></b>
     </label>
     <label class="field">释义
-      <input id="fMean" type="range" min="14" max="30" step="1">
+      <input id="fMean" type="range" min="14" max="40" step="1">
       <b class="num" id="vMean"></b>
     </label>
     <button id="copyCss" title="把当前字号复制成 CSS，贴回 style.css 就能固化">复制 CSS</button>
@@ -225,7 +225,7 @@
   var frame = $('frame'), iframe = $('app'), stage = $('stage');
   var wIn = $('w'), hIn = $('h'), zoomIn = $('zoom'), zoomVal = $('zoomVal'), presetSel = $('preset');
 
-  var st = { w: 390, h: 844, zoom: 85, clean: false, typo: { word: 34, phon: 14, mean: 18 } };
+  var st = { w: 390, h: 844, zoom: 85, clean: false, typo: { word: 56, phon: 24, mean: 30 } };
 
   /* ---------- 存取 ---------- */
   function load() {
@@ -306,7 +306,7 @@
   });
 
   /* ---------- 字号调节 ---------- */
-  var TYPO_DEFAULT = { word: 34, phon: 14, mean: 18 };   // 对应 style.css 里的现值
+  var TYPO_DEFAULT = { word: 56, phon: 24, mean: 30 };   // 对应 style.css 里的现值
   var fWord = $('fWord'), fPhon = $('fPhon'), fMean = $('fMean');
   var vWord = $('vWord'), vPhon = $('vPhon'), vMean = $('vMean');
 
@@ -435,6 +435,17 @@
   load();
   // 支持 ?clean=1 直接进「只有 App」的模式
   if (/[?&]clean=1/.test(location.search)) st.clean = true;
+
+  // ?page=study 自动点「继续背诵」进学习页 —— 调卡片字号时不用每次手点
+  if (/[?&]page=study/.test(location.search)) {
+    iframe.addEventListener('load', function () {
+      var d;
+      try { d = iframe.contentDocument; } catch (e) { return; }
+      var btn = d && d.getElementById('btnContinue');
+      if (btn) btn.click();
+    });
+  }
+
   apply();
   renderTypo();
   applyTypo();
