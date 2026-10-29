@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fwords · 调试台</title>
+<style>
+  :root {
+    --bg: #f2f4f7;
+    --bar: #ffffff;
+    --line: #e2e6ec;
+    --text: #1b2130;
+    --text2: #5b6577;
+    --accent: #2f6fed;
+    --accent-soft: #e8f0fe;
+    --shadow: 0 18px 50px rgba(20, 30, 60, .16), 0 2px 8px rgba(20, 30, 60, .08);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- 工具条 ---------- */
+  .bar {
+    flex: none;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 10px 16px;
+    background: var(--bar);
+    border-bottom: 1px solid var(--line);
+    z-index: 20;
+  }
+  .bar .title { font-weight: 600; letter-spacing: -.2px; margin-right: 4px; white-space: nowrap; }
+  .bar .title span { color: var(--text2); font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .field { display: flex; align-items: center; gap: 6px; color: var(--text2); font-size: 12px; white-space: nowrap; }
+  select, input[type="number"] {
+    font: inherit; font-size: 13px; color: var(--text);
+    background: #fff; border: 1px solid var(--line); border-radius: 8px;
+    padding: 5px 8px; outline: none;
+  }
+  input[type="number"] { width: 66px; -moz-appearance: textfield; }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  select:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  input[type="range"] { width: 92px; accent-color: var(--accent); }
+  .spacer { flex: 1; }
+  button {
+    font: inherit; font-size: 13px; color: var(--text);
+    background: #fff; border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 12px; cursor: pointer; white-space: nowrap;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  button:hover { background: #f6f8fb; border-color: #cfd6e0; }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: #255ed6; border-color: #255ed6; }
+  .hint { font-size: 12px; color: var(--text2); }
+
+  /* ---------- 舞台 ---------- */
+  .stage {
+    flex: 1; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    overflow: auto;
+  }
+  .frame {
+    position: relative;
+    width: 390px; height: 844px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    flex: none;
+    transition: box-shadow .2s;
+  }
+  .frame iframe {
+    display: block;
+    width: 100%; height: 100%;
+    border: 0;
+    background: #fff;
+  }
+  /* 拖拽时别让 iframe 抢事件 */
+  body.dragging .frame iframe { pointer-events: none; }
+  body.dragging { user-select: none; cursor: nwse-resize; }
+
+  /* 拖拽把手 */
+  .grip { position: absolute; z-index: 5; }
+  .grip.r  { top: 0; right: -4px; width: 10px; height: 100%; cursor: ew-resize; }
+  .grip.b  { left: 0; bottom: -4px; width: 100%; height: 10px; cursor: ns-resize; }
+  .grip.br { right: -4px; bottom: -4px; width: 20px; height: 20px; cursor: nwse-resize; }
+  .grip.br::after {
+    content: ''; position: absolute; right: 7px; bottom: 7px;
+    width: 7px; height: 7px;
+    border-right: 2px solid #b6bfcc; border-bottom: 2px solid #b6bfcc;
+    border-radius: 0 0 2px 0;
+  }
+
+  /* ---------- 关闭调试壳后：只剩 App ---------- */
+  body.clean { background: #fff; }
+  body.clean .bar { display: none; }
+  body.clean .stage { padding: 0; overflow: hidden; }
+  body.clean .frame {
+    width: 100% !important; height: 100% !important;
+    border: 0; border-radius: 0; box-shadow: none;
+  }
+  body.clean .grip { display: none; }
+
+  .reopen {
+    position: fixed; right: 18px; bottom: 18px; z-index: 40;
+    width: 42px; height: 42px; padding: 0; border-radius: 50%;
+    font-size: 18px; line-height: 1;
+    background: #fff; border: 1px solid var(--line);
+    box-shadow: 0 6px 20px rgba(20, 30, 60, .18);
+    display: none;
+  }
+  body.clean .reopen { display: block; }
+  .reopen:hover { background: #f6f8fb; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(10px);
+    background: #1b2130; color: #fff; font-size: 13px;
+    padding: 8px 16px; border-radius: 999px;
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    z-index: 60;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="title">Fwords 调试台<span>改完代码点「刷新」即可</span></div>
+
+  <label class="field">设备
+    <select id="preset"></select>
+  </label>
+  <label class="field">宽 <input id="w" type="number" min="280" max="1600" step="1"></label>
+  <label class="field">高 <input id="h" type="number" min="360" max="1600" step="1"></label>
+  <label class="field">缩放 <input id="zoom" type="range" min="40" max="100" step="5"><b id="zoomVal" style="color:var(--text);font-weight:500"></b></label>
+
+  <span class="spacer"></span>
+
+  <button id="reload">刷新</button>
+  <button id="reset" title="清掉预览里的存档，回到首次打开的状态">清空存档</button>
+  <button id="clean" class="primary" title="隐藏调试壳，全屏只看 App">关闭调试壳</button>
+</header>
+
+<main class="stage" id="stage">
+  <div class="frame" id="frame">
+    <iframe id="app" src="../demo/index.html" title="Fwords 预览"></iframe>
+    <span class="grip r"  data-mode="x"></span>
+    <span class="grip b"  data-mode="y"></span>
+    <span class="grip br" data-mode="xy"></span>
+  </div>
+</main>
+
+<button class="reopen" id="reopen" title="打开调试壳（Esc 也可）">⚙</button>
+<div class="toast" id="toast"></div>
+
+<script>
+;(function () {
+  'use strict';
+
+  var KEY = 'fwords.devbox.v1';
+  var PRESETS = [
+    { name: 'iPhone SE',        w: 375, h: 667 },
+    { name: 'iPhone 14',        w: 390, h: 844 },
+    { name: 'iPhone 14 Pro Max',w: 430, h: 932 },
+    { name: 'Pixel 7',          w: 412, h: 915 },
+    { name: 'iPad mini',        w: 768, h: 1024 },
+    { name: '桌面',              w: 1280, h: 800 }
+  ];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var frame = $('frame'), iframe = $('app'), stage = $('stage');
+  var wIn = $('w'), hIn = $('h'), zoomIn = $('zoom'), zoomVal = $('zoomVal'), presetSel = $('preset');
+
+  var st = { w: 390, h: 844, zoom: 85, clean: false };
+
+  /* ---------- 存取 ---------- */
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return;
+      var o = JSON.parse(raw);
+      if (o && typeof o === 'object') {
+        if (+o.w) st.w = +o.w;
+        if (+o.h) st.h = +o.h;
+        if (+o.zoom) st.zoom = +o.zoom;
+        st.clean = !!o.clean;
+      }
+    } catch (e) { /* 隐私模式忽略 */ }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {}
+  }
+
+  /* ---------- 应用尺寸 ---------- */
+  function apply() {
+    st.w = clamp(st.w, 280, 1600);
+    st.h = clamp(st.h, 360, 1600);
+    st.zoom = clamp(st.zoom, 40, 100);
+
+    frame.style.width = st.w + 'px';
+    frame.style.height = st.h + 'px';
+    frame.style.zoom = st.zoom / 100;
+
+    wIn.value = st.w;
+    hIn.value = st.h;
+    zoomIn.value = st.zoom;
+    zoomVal.textContent = st.zoom + '%';
+
+    document.body.classList.toggle('clean', st.clean);
+
+    // 命中预设就选中，否则留空
+    var hit = PRESETS.filter(function (p) { return p.w === st.w && p.h === st.h; })[0];
+    presetSel.value = hit ? hit.name : '';
+  }
+  function clamp(v, a, b) { return Math.min(b, Math.max(a, Math.round(v))); }
+
+  /* ---------- 拖动边缘改尺寸 ---------- */
+  var drag = null;
+  function down(e, mode) {
+    e.preventDefault();
+    drag = { mode: mode, x: e.clientX, y: e.clientY, w: st.w, h: st.h };
+    document.body.classList.add('dragging');
+    if (e.target.setPointerCapture) { try { e.target.setPointerCapture(e.pointerId); } catch (err) {} }
+  }
+  function move(e) {
+    if (!drag) return;
+    var k = 100 / st.zoom;            // 屏幕像素 → CSS 像素（frame 被 zoom 缩过）
+    var dx = (e.clientX - drag.x) * k;
+    var dy = (e.clientY - drag.y) * k;
+    if (drag.mode.indexOf('x') >= 0) st.w = clamp(drag.w + dx, 280, 1600);
+    if (drag.mode.indexOf('y') >= 0) st.h = clamp(drag.h + dy, 360, 1600);
+    apply();
+  }
+  function up() {
+    if (!drag) return;
+    drag = null;
+    document.body.classList.remove('dragging');
+    save();
+  }
+
+  document.querySelectorAll('.grip').forEach(function (g) {
+    g.addEventListener('pointerdown', function (e) { down(e, g.dataset.mode); });
+    g.addEventListener('pointermove', move);
+    g.addEventListener('pointerup', up);
+    g.addEventListener('pointercancel', up);
+  });
+
+  /* ---------- 控件 ---------- */
+  PRESETS.forEach(function (p) {
+    var o = document.createElement('option');
+    o.value = p.name; o.textContent = p.name + ' · ' + p.w + '×' + p.h;
+    presetSel.appendChild(o);
+  });
+  presetSel.addEventListener('change', function () {
+    var p = PRESETS.filter(function (x) { return x.name === presetSel.value; })[0];
+    if (!p) return;
+    st.w = p.w; st.h = p.h;
+    apply(); save();
+  });
+  wIn.addEventListener('input', function () { if (+wIn.value) { st.w = +wIn.value; apply(); } });
+  hIn.addEventListener('input', function () { if (+hIn.value) { st.h = +hIn.value; apply(); } });
+  wIn.addEventListener('change', save);
+  hIn.addEventListener('change', save);
+  zoomIn.addEventListener('input', function () { st.zoom = +zoomIn.value; apply(); save(); });
+
+  $('reload').addEventListener('click', function () { iframe.src = iframe.src.split('?')[0] + '?t=' + Date.now(); });
+
+  $('reset').addEventListener('click', function () {
+    var ok = false;
+    try {
+      iframe.contentWindow.localStorage.removeItem('fwords.state.v1');
+      ok = true;
+    } catch (e) {}
+    if (ok) { iframe.src = iframe.src.split('?')[0] + '?t=' + Date.now(); toast('已清空预览存档'); }
+    else { toast('清不掉（file:// 下跨文档访问被拦），改用 http 打开'); }
+  });
+
+  $('clean').addEventListener('click', function () {
+    st.clean = true; apply(); save();
+    toast('已关闭调试壳 · 按 Esc 或右下角 ⚙ 可以再打开');
+  });
+  $('reopen').addEventListener('click', function () { st.clean = false; apply(); save(); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { st.clean = !st.clean; apply(); save(); }
+  });
+
+  /* ---------- 小提示 ---------- */
+  var toastEl = $('toast'), toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
+  }
+
+  /* ---------- 启动 ---------- */
+  load();
+  // 支持 ?clean=1 直接进「只有 App」的模式
+  if (/[?&]clean=1/.test(location.search)) st.clean = true;
+  apply();
+
+  // 首次打开发现 iframe 是空白的常见原因：file:// 下浏览器拦跨文档访问
+  if (location.protocol === 'file:') {
+    setTimeout(function () { toast('建议用 http 打开：python -m http.server 8000'); }, 800);
+  }
+})();
+</script>
+</body>
+</html>
