@@ -112,6 +112,7 @@
     border: 0; border-radius: 0; box-shadow: none;
   }
   body.clean .grip { display: none; }
+  body.clean .panel { display: none; }
 
   .reopen {
     position: fixed; right: 18px; bottom: 18px; z-index: 40;
@@ -133,6 +134,50 @@
     z-index: 60;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- 字号面板 ---------- */
+  .panel {
+    position: fixed; right: 18px; top: 62px; z-index: 30;
+    width: 272px;
+    background: var(--bar);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(20, 30, 60, .14);
+    overflow: hidden;
+  }
+  .panel[hidden] { display: none; }
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px 8px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .panel-head b { font-size: 13px; font-weight: 600; }
+  .stat { font-style: normal; font-size: 11px; color: var(--text2); margin-left: 8px; }
+  .stat.ok::before { content: '●'; color: #1a9b63; margin-right: 4px; }
+  .stat.bad::before { content: '●'; color: #e5484d; margin-right: 4px; }
+  .panel-head .icon {
+    width: 26px; height: 26px; padding: 0; border: 0; background: transparent;
+    font-size: 17px; line-height: 1; color: var(--text2); border-radius: 6px;
+  }
+  .panel-head .icon:hover { background: #f2f4f7; color: var(--text); }
+  .panel-body { padding: 10px 14px 4px; }
+  .row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text2);
+    padding: 5px 0;
+  }
+  .row span { width: 52px; flex: none; }
+  .row input[type="range"] { flex: 1; width: auto; min-width: 0; }
+  .row b {
+    width: 38px; flex: none; text-align: right;
+    font-weight: 500; font-size: 12px; color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .panel-foot {
+    display: flex; gap: 8px;
+    padding: 10px 14px 14px;
+  }
+  .panel-foot button { flex: 1; font-size: 12px; padding: 6px 8px; }
 </style>
 </head>
 <body>
@@ -149,6 +194,7 @@
 
   <span class="spacer"></span>
 
+  <button id="fontBtn" title="调字号（改完可复制 CSS）">字号</button>
   <button id="reload">刷新</button>
   <button id="reset" title="清掉预览里的存档，回到首次打开的状态">清空存档</button>
   <button id="clean" class="primary" title="隐藏调试壳，全屏只看 App">关闭调试壳</button>
@@ -164,6 +210,24 @@
 </main>
 
 <button class="reopen" id="reopen" title="打开调试壳（Esc 也可）">⚙</button>
+
+<aside class="panel" id="fontPanel" hidden>
+  <div class="panel-head">
+    <div><b>字体大小</b><i class="stat" id="fontStat"></i></div>
+    <button class="icon" id="fontClose" title="关闭面板">×</button>
+  </div>
+  <div class="panel-body">
+    <label class="row"><span>单词</span><input type="range" id="fWord" min="20" max="56" step="1"><b id="vWord"></b></label>
+    <label class="row"><span>音标</span><input type="range" id="fPhon" min="10" max="24" step="1"><b id="vPhon"></b></label>
+    <label class="row"><span>释义</span><input type="range" id="fMean" min="12" max="32" step="1"><b id="vMean"></b></label>
+    <label class="row"><span>卡片提示</span><input type="range" id="fHint" min="10" max="20" step="1"><b id="vHint"></b></label>
+  </div>
+  <div class="panel-foot">
+    <button id="fontReset">恢复默认</button>
+    <button id="fontCopy" class="primary">复制 CSS</button>
+  </div>
+</aside>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -184,7 +248,10 @@
   var frame = $('frame'), iframe = $('app'), stage = $('stage');
   var wIn = $('w'), hIn = $('h'), zoomIn = $('zoom'), zoomVal = $('zoomVal'), presetSel = $('preset');
 
-  var st = { w: 390, h: 844, zoom: 85, clean: false };
+  var st = { w: 390, h: 844, zoom: 85, clean: false, fontOpen: true };
+
+  var FONT_DEFAULT = { word: 34, phon: 14, mean: 18, hint: 12 };
+  var fonts = { word: 34, phon: 14, mean: 18, hint: 12 };
 
   /* ---------- 存取 ---------- */
   function load() {
@@ -197,11 +264,20 @@
         if (+o.h) st.h = +o.h;
         if (+o.zoom) st.zoom = +o.zoom;
         st.clean = !!o.clean;
+        if (typeof o.fontOpen === 'boolean') st.fontOpen = o.fontOpen;
+        if (o.fonts && typeof o.fonts === 'object') {
+          ['word', 'phon', 'mean', 'hint'].forEach(function (k) {
+            if (+o.fonts[k]) fonts[k] = +o.fonts[k];
+          });
+        }
       }
     } catch (e) { /* 隐私模式忽略 */ }
   }
   function save() {
-    try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {}
+    try {
+      st.fonts = fonts;
+      localStorage.setItem(KEY, JSON.stringify(st));
+    } catch (e) {}
   }
 
   /* ---------- 应用尺寸 ---------- */
@@ -307,11 +383,116 @@
     toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
   }
 
+  /* ---------- 字号面板 ---------- */
+  var fontPanel = $('fontPanel');
+  var FONT_ROWS = [
+    { key: 'word', input: 'fWord', out: 'vWord' },
+    { key: 'phon', input: 'fPhon', out: 'vPhon' },
+    { key: 'mean', input: 'fMean', out: 'vMean' },
+    { key: 'hint', input: 'fHint', out: 'vHint' }
+  ];
+
+  /* 当前字号 → 一段能直接贴进 demo/style.css 的 CSS */
+  function fontCSS() {
+    return [
+      '.word { font-size: ' + fonts.word + 'px; }',
+      '.phonetic { font-size: ' + fonts.phon + 'px; }',
+      '.meaning { font-size: ' + fonts.mean + 'px; line-height: 1.65; }',
+      '.card-hint { font-size: ' + fonts.hint + 'px; }'
+    ].join('\n');
+  }
+
+  /* 直接往 iframe 的文档里塞一个 <style> —— 同源才行，file:// 会失败 */
+  function applyFonts() {
+    var doc = null;
+    try { doc = iframe.contentDocument; } catch (e) { doc = null; }
+    if (!doc || !doc.head) { setStat(false); return false; }
+    var el = doc.getElementById('devbox-fonts');
+    if (!el) {
+      el = doc.createElement('style');
+      el.id = 'devbox-fonts';
+      doc.head.appendChild(el);
+    }
+    el.textContent = fontCSS();
+    setStat(true);
+    return true;
+  }
+
+  function setStat(ok) {
+    var el = $('fontStat');
+    if (!el) return;
+    el.className = 'stat ' + (ok ? 'ok' : 'bad');
+    el.textContent = ok ? '已生效' : '未连接';
+  }
+
+  function renderFonts() {
+    FONT_ROWS.forEach(function (r) {
+      $(r.input).value = fonts[r.key];
+      $(r.out).textContent = fonts[r.key] + 'px';
+    });
+  }
+
+  function showFontPanel(on, silent) {
+    fontPanel.hidden = !on;
+    st.fontOpen = on;
+    // 启动时 iframe 可能还没 load 完，这时注入失败不算错，别吓人
+    if (on && !applyFonts() && !silent) toast('改不了字号：iframe 跨文档被拦，改用 http 打开');
+    save();
+  }
+
+  FONT_ROWS.forEach(function (r) {
+    var input = $(r.input);
+    input.addEventListener('input', function () {
+      fonts[r.key] = +input.value;
+      $(r.out).textContent = input.value + 'px';
+      applyFonts();
+      save();
+    });
+  });
+
+  $('fontBtn').addEventListener('click', function () { showFontPanel(fontPanel.hidden); });
+  $('fontClose').addEventListener('click', function () { showFontPanel(false); });
+
+  $('fontReset').addEventListener('click', function () {
+    fonts = { word: FONT_DEFAULT.word, phon: FONT_DEFAULT.phon, mean: FONT_DEFAULT.mean, hint: FONT_DEFAULT.hint };
+    renderFonts(); applyFonts(); save();
+    toast('已恢复默认字号');
+  });
+
+  $('fontCopy').addEventListener('click', function () {
+    var text = fontCSS();
+    function done() { toast('CSS 已复制，贴进 demo/style.css 就行'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
+    } else {
+      fallbackCopy(text, done);
+    }
+  });
+
+  function fallbackCopy(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { toast('复制失败，手动抄一下'); }
+    document.body.removeChild(ta);
+  }
+
+  // iframe 每次刷新后要重新注入（新文档没有上次那个 style）
+  iframe.addEventListener('load', function () {
+    if (!st.fontOpen) return;
+    applyFonts();
+  });
+
   /* ---------- 启动 ---------- */
   load();
   // 支持 ?clean=1 直接进「只有 App」的模式
   if (/[?&]clean=1/.test(location.search)) st.clean = true;
   apply();
+  renderFonts();
+  showFontPanel(st.fontOpen, true);
 
   // 首次打开发现 iframe 是空白的常见原因：file:// 下浏览器拦跨文档访问
   if (location.protocol === 'file:') {
